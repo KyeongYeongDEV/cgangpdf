@@ -41,6 +41,8 @@
       "featureList": [
         "PDF 페이지 순서 변경 (무손실)",
         "PDF 페이지 삭제 (무손실)",
+        "펜·형광펜 필기 (무손실 오버레이)",
+        "페이지 자르기 (무손실 CropBox)",
         "3단계 PDF 압축 (72/150/300dpi)",
         "이미지(JPG/PNG) → PDF 변환",
         "PDF → 이미지(JPG) 추출",
@@ -181,6 +183,24 @@
     color: #fff; font-size: 14px; background: rgba(0,0,0,.45);
     padding: 6px 14px; border-radius: 20px;
   }
+  #lbStage { position: relative; display: flex; }
+  #lbDraw {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: none; touch-action: none; cursor: crosshair;
+  }
+  .lbbar {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center; background: rgba(20,24,32,.88);
+    padding: 8px 12px; border-radius: 12px; z-index: 5; flex-wrap: wrap;
+    max-width: calc(100vw - 140px); justify-content: center;
+  }
+  .lbbar[hidden] { display: none; }
+  .lbbar button { padding: 7px 12px; font-size: 13px; }
+  .lbbar button.on { background: #2563eb; color: #fff; }
+  .lbbar .sw { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.25); }
+  .lbbar .sw.on { border-color: #fff; }
+  .lbbar input[type=range] { width: 80px; }
+  .lbbar .hint2 { color: #cdd3dd; font-size: 12px; }
   #cmpModal {
     position: fixed; inset: 0; z-index: 90; background: rgba(12,14,18,.5);
     display: flex; align-items: center; justify-content: center;
@@ -257,7 +277,7 @@
     <p style="margin-bottom:14px">CgangPDF는 회원가입 없이 쓰는 무료 PDF 편집·압축 사이트입니다.
        PDF 페이지 삭제, 순서 변경, PDF 용량 줄이기를 프로그램 설치 없이 브라우저에서 바로 처리하세요.</p>
     <div class="features">
-      <div><strong>📄 무료 PDF 편집</strong>썸네일을 드래그해서 페이지 순서를 바꾸고, 필요 없는 페이지는 ✕ 버튼으로 삭제합니다. 원본 화질 그대로(무손실) 저장됩니다.</div>
+      <div><strong>📄 무료 PDF 편집</strong>썸네일을 드래그해서 페이지 순서를 바꾸고, 필요 없는 페이지는 ✕ 버튼으로 삭제합니다. 확대 보기에서 펜·형광펜으로 필기하거나 페이지를 자를 수도 있습니다. 원본 화질 그대로(무손실) 저장됩니다.</div>
       <div><strong>🗜️ 무료 PDF 압축</strong>저화질·중화질·고화질 3단계 중에서 선택해 PDF 용량을 줄입니다. 스캔본이나 이미지 위주 PDF에서 효과가 큽니다.</div>
       <div><strong>🔄 PDF ↔ 이미지 변환</strong>JPG·PNG 여러 장을 순서대로 묶어 하나의 PDF로 만들거나, 반대로 PDF의 각 페이지를 JPG 이미지로 추출합니다.</div>
       <div><strong>🔒 완전한 프라이버시</strong>파일이 서버로 전송되지 않습니다. 모든 처리가 내 브라우저 안에서만 이루어지고, 탭을 닫으면 흔적 없이 사라집니다.</div>
@@ -329,11 +349,39 @@
 </footer>
 
 <div id="lightbox" hidden>
-  <img id="lbImg" alt="page preview">
+  <div id="lbStage">
+    <img id="lbImg" alt="page preview">
+    <canvas id="lbDraw"></canvas>
+  </div>
   <button class="nav" id="lbPrev" title="이전 페이지">‹</button>
   <button class="nav" id="lbNext" title="다음 페이지">›</button>
   <button id="lbClose" title="닫기 (Esc)">✕</button>
   <div id="lbInfo"></div>
+  <div class="lbbar" id="lbTools" hidden>
+    <button id="lbDrawBtn">✏️ 그리기</button>
+    <button id="lbCropBtn">✂️ 자르기</button>
+    <button id="lbUncropBtn" hidden>자르기 해제</button>
+  </div>
+  <div class="lbbar" id="drawBar" hidden>
+    <button id="toolPen" class="on">펜</button>
+    <button id="toolHl">형광펜</button>
+    <button id="toolEraser">지우개</button>
+    <button class="sw on" data-c="#111827" style="background:#111827" title="검정"></button>
+    <button class="sw" data-c="#dc2626" style="background:#dc2626" title="빨강"></button>
+    <button class="sw" data-c="#2563eb" style="background:#2563eb" title="파랑"></button>
+    <button class="sw" data-c="#16a34a" style="background:#16a34a" title="초록"></button>
+    <button class="sw" data-c="#eab308" style="background:#eab308" title="노랑"></button>
+    <input type="range" id="penW" min="2" max="14" value="4" title="굵기">
+    <button id="undoBtn">되돌리기</button>
+    <button id="clearBtn">전체 지움</button>
+    <button class="primary" id="drawDone">완료</button>
+    <button id="drawCancel">취소</button>
+  </div>
+  <div class="lbbar" id="cropBar" hidden>
+    <span class="hint2">드래그해서 남길 영역을 선택하세요</span>
+    <button class="primary" id="cropApply">적용</button>
+    <button id="cropCancel">취소</button>
+  </div>
 </div>
 
 <div id="cmpModal" hidden>
@@ -434,14 +482,41 @@ async function loadImages(files) {
   $("apply").hidden = $("reset").hidden = false;
 }
 
-async function renderPage(pageNum, targetLongSide, quality) {
+// 페이지를 캔버스로 렌더링하고, 그리기(pageDraw)·자르기(crops)를 합성한다.
+// 썸네일·미리보기·압축·이미지 추출이 모두 이 함수를 거치므로 편집 결과가 어디서나 보인다.
+async function pageCanvas(pageNum, targetLongSide, opts = {}) {
   const page = await pdfDoc.getPage(pageNum);
   const base = page.getViewport({ scale: 1 });
-  const scale = Math.min(2.5, targetLongSide / Math.max(base.width, base.height));
+  const maxScale = opts.maxScale ?? 2.5;
+  const scale = Math.max(0.05,
+    Math.min(maxScale, targetLongSide / Math.max(base.width, base.height)));
   const vp = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
+  let canvas = document.createElement("canvas");
   canvas.width = vp.width; canvas.height = vp.height;
-  await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  const d = !opts.ignoreDraw && pageDraw.get(pageNum);
+  if (d) ctx.drawImage(d.canvas, 0, 0, canvas.width, canvas.height);
+  const c = !opts.ignoreCrop && crops.get(pageNum);
+  let baseW = base.width, baseH = base.height;
+  if (c) {
+    const sx = Math.round(c.nx * canvas.width), sy = Math.round(c.ny * canvas.height);
+    const sw = Math.max(1, Math.round(c.nw * canvas.width));
+    const sh = Math.max(1, Math.round(c.nh * canvas.height));
+    const out = document.createElement("canvas");
+    out.width = sw; out.height = sh;
+    out.getContext("2d").drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    canvas.width = canvas.height = 0;
+    canvas = out;
+    baseW = base.width * c.nw; baseH = base.height * c.nh;
+  }
+  return { canvas, baseW, baseH };
+}
+
+async function renderPage(pageNum, targetLongSide, quality, opts) {
+  const { canvas } = await pageCanvas(pageNum, targetLongSide, opts);
   const url = canvas.toDataURL("image/jpeg", quality);
   canvas.width = canvas.height = 0;   // 메모리 즉시 반환
   return url;
@@ -516,6 +591,7 @@ async function previewURL(page) {
 }
 
 async function openLightbox(i) {
+  if (lbMode) return;                 // 그리기/자르기 중에는 페이지 이동 금지
   const cs = cardList();
   if (!cs.length) return;
   lbIndex = (i + cs.length) % cs.length;
@@ -527,7 +603,10 @@ async function openLightbox(i) {
   const suffix = mode === "images" ? "" : "쪽";
   $("lbInfo").textContent =
     `${lbIndex + 1} / ${cs.length} · ${unit} ${page}${suffix}` +
-    (card.classList.contains("deleted") ? " · 삭제 예정" : "");
+    (card.classList.contains("deleted") ? " · 삭제 예정" : "") +
+    (pageDraw.has(page) ? " · ✏️" : "") + (crops.has(page) ? " · ✂️" : "");
+  $("lbTools").hidden = mode !== "pdf";
+  $("lbUncropBtn").hidden = !crops.has(page);
   $("lbImg").src = card.querySelector("img").src;   // 우선 썸네일로 즉시 표시
   if (mode === "images") return;                    // 이미지 모드는 원본이 곧 고해상도
   const url = await previewURL(page);
@@ -547,13 +626,218 @@ function closeLightbox() {
 $("lbPrev").onclick = e => { e.stopPropagation(); openLightbox(lbIndex - 1); };
 $("lbNext").onclick = e => { e.stopPropagation(); openLightbox(lbIndex + 1); };
 $("lbClose").onclick = closeLightbox;
-$("lightbox").onclick = e => { if (e.target.id === "lightbox") closeLightbox(); };
+$("lightbox").onclick = e => { if (e.target.id === "lightbox" && !lbMode) closeLightbox(); };
 document.addEventListener("keydown", e => {
   if ($("lightbox").hidden) return;
+  if (lbMode) { if (e.key === "Escape") exitSubMode(); return; }
   if (e.key === "Escape") closeLightbox();
   else if (e.key === "ArrowLeft") openLightbox(lbIndex - 1);
   else if (e.key === "ArrowRight") openLightbox(lbIndex + 1);
 });
+
+// ---- 그리기·자르기 (라이트박스 안, PDF 모드 전용) ----
+const pageDraw = new Map();  // page -> { canvas } 투명 오버레이 (원본 무손실 유지)
+const crops = new Map();     // page -> { nx, ny, nw, nh } 0~1 정규화 좌표
+const DRAW_TARGET = 2000;    // 오버레이 내부 해상도 (긴 변 기준)
+
+let lbMode = null;           // null | "draw" | "crop"
+let drawTool = "pen", drawColor = "#111827";
+let sessionStrokes = [], sessionBase = null, curStroke = null;
+let sel = null;              // crop: {x0,y0,x1,y1} (canvas 좌표)
+
+const curPage = () => Number(cardList()[lbIndex].dataset.page);
+const cv = $("lbDraw");
+const cvx = () => cv.getContext("2d");
+
+function toggleLbChrome() {
+  const sub = !!lbMode;
+  ["lbPrev", "lbNext", "lbClose", "lbInfo"].forEach(id => $(id).hidden = sub);
+  $("lbTools").hidden = sub || mode !== "pdf";
+  $("drawBar").hidden = lbMode !== "draw";
+  $("cropBar").hidden = lbMode !== "crop";
+  cv.style.display = sub ? "block" : "none";
+}
+
+async function refreshPage(p) {
+  previewCache.delete(p);
+  const img = document.querySelector(`.card[data-page="${p}"] img`);
+  if (img) img.src = await renderPage(p, 300, 0.7);
+  const num = document.querySelector(`.card[data-page="${p}"] .num`);
+  if (num) num.textContent = `원본 ${p}쪽`
+    + (pageDraw.has(p) ? " ✏️" : "") + (crops.has(p) ? " ✂️" : "");
+}
+
+async function setBackdrop(page, opts) {
+  const { canvas } = await pageCanvas(page, DRAW_TARGET, opts);
+  cv.width = canvas.width; cv.height = canvas.height;
+  $("lbImg").src = canvas.toDataURL("image/jpeg", 0.9);
+  canvas.width = canvas.height = 0;
+}
+
+$("lbDrawBtn").onclick = async () => {
+  const page = curPage();
+  lbMode = "draw"; toggleLbChrome();
+  // 그리기는 항상 전체 페이지 기준 (자르기 이전 좌표계)
+  await setBackdrop(page, { ignoreCrop: true, ignoreDraw: true });
+  sessionBase = document.createElement("canvas");
+  sessionBase.width = cv.width; sessionBase.height = cv.height;
+  const d = pageDraw.get(page);
+  if (d) sessionBase.getContext("2d").drawImage(d.canvas, 0, 0, cv.width, cv.height);
+  sessionStrokes = []; curStroke = null;
+  redrawDraw();
+};
+
+function paintStroke(ctx, s) {
+  if (s.points.length < 2 && s.tool !== "pen") return;
+  ctx.save();
+  ctx.lineJoin = ctx.lineCap = "round";
+  if (s.tool === "eraser") {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineWidth = s.width * 4;
+    ctx.strokeStyle = "#000";
+  } else if (s.tool === "hl") {
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = s.width * 4;
+    ctx.strokeStyle = s.color;
+  } else {
+    ctx.lineWidth = s.width;
+    ctx.strokeStyle = s.color;
+  }
+  ctx.beginPath();
+  ctx.moveTo(s.points[0].x, s.points[0].y);
+  for (const p of s.points.slice(1)) ctx.lineTo(p.x, p.y);
+  if (s.points.length === 1) ctx.lineTo(s.points[0].x + 0.1, s.points[0].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function redrawDraw() {
+  const ctx = cvx();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(sessionBase, 0, 0);
+  for (const s of sessionStrokes) paintStroke(ctx, s);
+  if (curStroke) paintStroke(ctx, curStroke);
+}
+
+function redrawCrop() {
+  const ctx = cvx();
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = "rgba(0,0,0,.5)";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  if (!sel) return;
+  const x = Math.min(sel.x0, sel.x1), y = Math.min(sel.y0, sel.y1);
+  const w = Math.abs(sel.x1 - sel.x0), h = Math.abs(sel.y1 - sel.y0);
+  ctx.clearRect(x, y, w, h);
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+  ctx.strokeRect(x, y, w, h);
+}
+
+function toCanvasPt(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width * cv.width,
+           y: (e.clientY - r.top) / r.height * cv.height };
+}
+
+cv.onpointerdown = e => {
+  if (!lbMode) return;
+  cv.setPointerCapture(e.pointerId);
+  const pt = toCanvasPt(e);
+  if (lbMode === "draw") {
+    curStroke = { tool: drawTool, color: drawColor, width: Number($("penW").value), points: [pt] };
+    redrawDraw();
+  } else {
+    sel = { x0: pt.x, y0: pt.y, x1: pt.x, y1: pt.y };
+    redrawCrop();
+  }
+};
+cv.onpointermove = e => {
+  if (!lbMode) return;
+  const pt = toCanvasPt(e);
+  if (lbMode === "draw" && curStroke) { curStroke.points.push(pt); redrawDraw(); }
+  else if (lbMode === "crop" && sel && e.buttons) { sel.x1 = pt.x; sel.y1 = pt.y; redrawCrop(); }
+};
+cv.onpointerup = () => {
+  if (lbMode === "draw" && curStroke) { sessionStrokes.push(curStroke); curStroke = null; redrawDraw(); }
+};
+
+// 도구 선택
+[["toolPen", "pen"], ["toolHl", "hl"], ["toolEraser", "eraser"]].forEach(([id, t]) =>
+  $(id).onclick = () => {
+    drawTool = t;
+    ["toolPen", "toolHl", "toolEraser"].forEach(x => $(x).classList.toggle("on", x === id));
+  });
+document.querySelectorAll("#drawBar .sw").forEach(b =>
+  b.onclick = () => {
+    drawColor = b.dataset.c;
+    document.querySelectorAll("#drawBar .sw").forEach(x => x.classList.toggle("on", x === b));
+  });
+$("undoBtn").onclick = () => { sessionStrokes.pop(); redrawDraw(); };
+$("clearBtn").onclick = () => {
+  sessionBase.getContext("2d").clearRect(0, 0, sessionBase.width, sessionBase.height);
+  sessionStrokes = []; redrawDraw();
+};
+
+function overlayIsEmpty(canvas) {
+  const t = document.createElement("canvas");
+  t.width = t.height = 40;
+  t.getContext("2d").drawImage(canvas, 0, 0, 40, 40);
+  return !t.getContext("2d").getImageData(0, 0, 40, 40).data.some((v, i) => i % 4 === 3 && v > 0);
+}
+
+$("drawDone").onclick = async () => {
+  const page = curPage();
+  // 세션 결과(배경 제외한 오버레이)를 페이지 오버레이로 저장
+  const ov = document.createElement("canvas");
+  ov.width = cv.width; ov.height = cv.height;
+  const ctx = ov.getContext("2d");
+  ctx.drawImage(sessionBase, 0, 0);
+  for (const s of sessionStrokes) paintStroke(ctx, s);
+  if (overlayIsEmpty(ov)) pageDraw.delete(page);
+  else pageDraw.set(page, { canvas: ov });
+  exitSubMode();
+  await refreshPage(page);
+  openLightbox(lbIndex);
+};
+$("drawCancel").onclick = exitSubMode;
+
+$("lbCropBtn").onclick = async () => {
+  const page = curPage();
+  lbMode = "crop"; toggleLbChrome();
+  await setBackdrop(page, { ignoreCrop: true });   // 그린 내용은 보이되 전체 페이지 기준
+  const c = crops.get(page);
+  sel = c ? { x0: c.nx * cv.width, y0: c.ny * cv.height,
+              x1: (c.nx + c.nw) * cv.width, y1: (c.ny + c.nh) * cv.height } : null;
+  redrawCrop();
+};
+
+$("cropApply").onclick = async () => {
+  const page = curPage();
+  if (!sel || Math.abs(sel.x1 - sel.x0) < 20 || Math.abs(sel.y1 - sel.y0) < 20)
+    return alert("남길 영역을 드래그로 선택해주세요.");
+  const x = Math.max(0, Math.min(sel.x0, sel.x1)), y = Math.max(0, Math.min(sel.y0, sel.y1));
+  const x2 = Math.min(cv.width, Math.max(sel.x0, sel.x1));
+  const y2 = Math.min(cv.height, Math.max(sel.y0, sel.y1));
+  crops.set(page, { nx: x / cv.width, ny: y / cv.height,
+                    nw: (x2 - x) / cv.width, nh: (y2 - y) / cv.height });
+  exitSubMode();
+  await refreshPage(page);
+  openLightbox(lbIndex);
+};
+$("cropCancel").onclick = exitSubMode;
+
+$("lbUncropBtn").onclick = async () => {
+  const page = curPage();
+  crops.delete(page);
+  await refreshPage(page);
+  openLightbox(lbIndex);
+};
+
+function exitSubMode() {
+  lbMode = null;
+  sel = null; curStroke = null;
+  toggleLbChrome();
+  openLightbox(lbIndex);   // 원래(자르기 반영된) 보기로 복귀
+}
 
 $("reset").onclick = () => location.reload();
 
@@ -583,20 +867,16 @@ async function compressPdf(level) {
       $("status").textContent = `압축 중… ${i + 1} / ${order.length}쪽`;
       const page = await pdfDoc.getPage(order[i]);
       const base = page.getViewport({ scale: 1 });
-      const scale = Math.max(0.1,
-        Math.min(dpi / 72, CMP_MAX_SIDE / Math.max(base.width, base.height)));
-      const vp = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
-      canvas.width = vp.width; canvas.height = vp.height;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff";                      // JPEG은 투명도가 없음
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const target = Math.min(CMP_MAX_SIDE,
+        (dpi / 72) * Math.max(base.width, base.height));
+      // pageCanvas가 그리기·자르기까지 합성해준다
+      const { canvas, baseW, baseH } =
+        await pageCanvas(order[i], target, { maxScale: dpi / 72 });
       const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
       canvas.width = canvas.height = 0;
       const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
-      const pg = out.addPage([base.width, base.height]);
-      pg.drawImage(img, { x: 0, y: 0, width: base.width, height: base.height });
+      const pg = out.addPage([baseW, baseH]);
+      pg.drawImage(img, { x: 0, y: 0, width: baseW, height: baseH });
     }
     $("status").textContent = "저장 중…";
     const data = await out.save();
@@ -717,7 +997,23 @@ $("apply").onclick = async () => {
     const src = await PDFLib.PDFDocument.load(origBytes, { ignoreEncryption: true });
     const out = await PDFLib.PDFDocument.create();
     const copied = await out.copyPages(src, order.map(p => p - 1));
-    copied.forEach(pg => out.addPage(pg));
+    for (let i = 0; i < copied.length; i++) {
+      const pg = copied[i];
+      out.addPage(pg);
+      const srcPage = order[i];
+      const mb = pg.getMediaBox();
+      const d = pageDraw.get(srcPage);
+      if (d) {   // 그린 내용을 투명 PNG 층으로 원본 위에 얹음 (원본은 무손실 유지)
+        const blob = await new Promise(r => d.canvas.toBlob(r, "image/png"));
+        const img = await out.embedPng(new Uint8Array(await blob.arrayBuffer()));
+        pg.drawImage(img, { x: mb.x, y: mb.y, width: mb.width, height: mb.height });
+      }
+      const c = crops.get(srcPage);
+      if (c)     // 자르기는 CropBox만 변경 — 페이지 내용은 그대로 (무손실)
+        pg.setCropBox(mb.x + c.nx * mb.width,
+                      mb.y + (1 - c.ny - c.nh) * mb.height,
+                      c.nw * mb.width, c.nh * mb.height);
+    }
     const data = await out.save();
     const blob = new Blob([data], { type: "application/pdf" });
     const a = document.createElement("a");

@@ -120,8 +120,25 @@
   button:hover { filter: brightness(0.96); }
   button.primary { background: #2563eb; color: #fff; }
   button:disabled { opacity: .45; cursor: default; }
+  #toolChoice {
+    max-width: 720px; margin: 10vh auto 0; padding: 0 24px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px;
+  }
+  #toolChoice .tool {
+    background: #fff; border: 2px solid #e3e5e8; border-radius: 16px;
+    padding: 40px 24px; text-align: center; cursor: pointer;
+    display: flex; flex-direction: column; gap: 10px; font-weight: 400;
+  }
+  #toolChoice .tool:hover { border-color: #2563eb; background: #f0f6ff; }
+  #toolChoice .tool .big { font-size: 19px; font-weight: 700; }
+  #toolChoice .tool span:not(.big) { color: #556; font-size: 13.5px; line-height: 1.6; }
+  #backHome {
+    display: block; text-align: center; margin: 18px auto 0;
+    background: none; color: #556; font-size: 14px;
+  }
+  #backHome:hover { color: #2563eb; }
   #drop {
-    max-width: 560px; margin: 12vh auto; padding: 64px 32px;
+    max-width: 560px; margin: 10vh auto 0; padding: 64px 32px;
     border: 2px dashed #b9bec7; border-radius: 16px; text-align: center;
     background: #fff; cursor: pointer; transition: border-color .15s;
   }
@@ -259,13 +276,23 @@
   <button class="primary" id="apply" hidden>적용 &amp; 다운로드</button>
 </header>
 
-<div id="drop">
-  <strong>PDF 또는 이미지(JPG·PNG)를 여기로 드래그하거나 클릭해서 선택</strong>
-  <p>PDF: 페이지 순서 변경 · 삭제 · 압축 · 이미지로 추출<br>
-     이미지 여러 장: 순서를 정해 하나의 PDF로 변환<br>
-     서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)</p>
+<div id="toolChoice">
+  <button class="tool" id="chooseEdit">
+    <span class="big">📄 PDF 편집 · 압축</span>
+    <span>페이지 순서 변경 · 삭제 · 펜 필기 · 자르기<br>3단계 용량 압축</span>
+  </button>
+  <button class="tool" id="chooseConvert">
+    <span class="big">🔄 파일 형변환</span>
+    <span>이미지(JPG·PNG) 여러 장 → 하나의 PDF<br>PDF → 페이지별 JPG 이미지(ZIP)</span>
+  </button>
+</div>
+
+<div id="drop" hidden>
+  <strong id="dropTitle"></strong>
+  <p id="dropDesc"></p>
   <input type="file" id="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple hidden>
 </div>
+<button id="backHome" hidden>← 처음으로 돌아가기</button>
 
 <div class="spinner" id="spin" hidden></div>
 <div id="grid"></div>
@@ -287,7 +314,8 @@
   <section id="guide">
     <h2>PDF 편집·압축 사용 방법</h2>
     <ol>
-      <li><strong>PDF 열기</strong> — 위쪽 점선 상자에 PDF 파일을 끌어다 놓거나, 클릭해서 파일을 선택합니다. (최대 100MB)</li>
+      <li><strong>작업 선택</strong> — 첫 화면에서 <strong>PDF 편집·압축</strong> 또는 <strong>파일 형변환</strong>을 선택합니다.</li>
+      <li><strong>파일 열기</strong> — 점선 상자에 파일을 끌어다 놓거나, 클릭해서 선택합니다. (최대 100MB)</li>
       <li><strong>페이지 확인</strong> — 모든 페이지가 썸네일로 나타납니다. 썸네일을 클릭하면 전체화면으로 크게 볼 수 있고, 좌우 화살표(← →)로 다음·이전 페이지를 넘겨볼 수 있습니다.</li>
       <li><strong>편집</strong> — 썸네일을 드래그해서 순서를 바꾸고, ✕ 버튼으로 필요 없는 페이지를 삭제 표시합니다. 실수로 삭제했다면 해당 페이지의 버튼을 한 번 더 누르면 복원됩니다.</li>
       <li><strong>저장</strong> — 화질을 유지하려면 <strong>적용 &amp; 다운로드</strong>(무손실), 파일 크기를 줄이려면 <strong>압축</strong>에서 원하는 단계를 선택하세요. 편집한 순서와 삭제가 그대로 반영됩니다.</li>
@@ -410,6 +438,56 @@ let imageURLs = [];     // image mode: object URLs (thumbnail = full-res)
 
 const IMG_RE = /\.(jpe?g|png|webp)$/i;
 
+// ---- 작업 선택 (홈 → 편집 / 형변환 페이지) ----
+let tool = null;   // null(홈) | "edit" | "convert"
+
+const TOOL_TEXT = {
+  edit: {
+    title: "PDF를 여기로 드래그하거나 클릭해서 선택",
+    desc: "페이지 순서 변경 · 삭제 · 펜 필기 · 자르기 · 압축<br>서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)",
+    accept: "application/pdf",
+  },
+  convert: {
+    title: "PDF 또는 이미지(JPG·PNG)를 드래그하거나 클릭해서 선택",
+    desc: "이미지 여러 장 → 순서를 정해 하나의 PDF로<br>PDF → 페이지별 JPG 이미지(ZIP)로<br>서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)",
+    accept: "application/pdf,image/jpeg,image/png,image/webp",
+  },
+};
+
+function showTool(t) {
+  tool = t;
+  $("toolChoice").hidden = true;
+  $("content").hidden = true;
+  $("footer").hidden = true;
+  $("drop").hidden = false;
+  $("backHome").hidden = false;
+  $("dropTitle").innerHTML = TOOL_TEXT[t].title;
+  $("dropDesc").innerHTML = TOOL_TEXT[t].desc;
+  $("file").setAttribute("accept", TOOL_TEXT[t].accept);
+  if (location.hash !== "#" + t) location.hash = t;
+}
+
+function showHome() {
+  tool = null;
+  $("toolChoice").hidden = false;
+  $("content").hidden = false;
+  $("footer").hidden = false;
+  $("drop").hidden = true;
+  $("backHome").hidden = true;
+  if (location.hash) history.pushState("", "", location.pathname + location.search);
+}
+
+$("chooseEdit").onclick = () => showTool("edit");
+$("chooseConvert").onclick = () => showTool("convert");
+$("backHome").onclick = showHome;
+window.addEventListener("hashchange", () => {
+  if (pdfDoc || imageFiles.length) return;   // 파일 작업 중에는 무시
+  const h = location.hash.replace("#", "");
+  h === "edit" || h === "convert" ? showTool(h) : showHome();
+});
+if (location.hash === "#edit") showTool("edit");
+else if (location.hash === "#convert") showTool("convert");
+
 $("drop").onclick = () => $("file").click();
 $("drop").ondragover = e => { e.preventDefault(); $("drop").classList.add("over"); };
 $("drop").ondragleave = () => $("drop").classList.remove("over");
@@ -421,6 +499,7 @@ $("file").onchange = () => { if ($("file").files.length) loadFiles([...$("file")
 
 function enterEditView() {
   $("drop").hidden = true;
+  $("backHome").hidden = true;
   $("content").hidden = true;
   $("footer").hidden = true;
   document.querySelectorAll("nav .homeOnly").forEach(a => a.hidden = true);
@@ -434,6 +513,10 @@ async function loadFiles(files) {
     return alert(
       `파일이 총 ${(total / 1048576).toFixed(0)}MB라서 열 수 없습니다 (제한 ${MAX_MB}MB).\n` +
       "브라우저 메모리 한계로 느려지거나 멈출 수 있어요.");
+  }
+  if (tool === "edit") {
+    if (pdfs.length === 1 && files.length === 1) return loadPdf(pdfs[0]);
+    return alert("PDF 편집은 PDF 파일 1개만 열 수 있습니다.\n이미지를 PDF로 만들려면 '파일 형변환' 메뉴를 이용하세요.");
   }
   if (pdfs.length === 1 && imgs.length === 0 && files.length === 1) return loadPdf(pdfs[0]);
   if (imgs.length >= 1 && pdfs.length === 0 && imgs.length === files.length) return loadImages(imgs);
@@ -452,7 +535,14 @@ async function loadPdf(f) {
     pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
     $("fname").textContent = `${f.name} · ${pdfDoc.numPages}쪽`;
     await renderGrid();
-    $("apply").hidden = $("reset").hidden = $("compress").hidden = $("extract").hidden = false;
+    $("reset").hidden = false;
+    if (tool === "convert") {
+      // 형변환 모드: PDF → 이미지 추출이 주 작업
+      $("extract").hidden = false;
+      $("extract").classList.add("primary");
+    } else {
+      $("apply").hidden = $("compress").hidden = $("extract").hidden = false;
+    }
   } catch (err) {
     alert("PDF를 열 수 없습니다: " + err.message);
     location.reload();

@@ -1,0 +1,23 @@
+# CgangPDF
+
+> 무료 PDF 페이지 편집·압축 웹 도구. 파일이 서버로 전송되지 않고 사용자의 브라우저 안에서만 처리되는 것이 특징이다. 설치와 회원가입이 필요 없다.
+
+## 주요 기능
+
+- PDF 페이지 순서 변경(드래그)과 페이지 삭제 — 무손실 저장
+- 3단계 압축: 저화질(72dpi) / 중화질(150dpi) / 고화질(300dpi) — 스캔본·이미지형 PDF에 효과적
+- 페이지 전체화면 미리보기와 좌우 넘기기
+- 압축 결과가 원본보다 커지면 저장 전에 경고 (텍스트형 PDF 보호)
+- 파일 크기 제한 100MB
+
+## 개인정보
+
+- 파일 업로드 서버가 존재하지 않음. 모든 처리는 브라우저(pdf.js, pdf-lib) 안에서 실행됨
+- 회원가입·개인정보 수집·자체 쿠키 없음
+
+## 페이지
+
+- [홈 (편집기)](https://cgangpdf.pages.dev/): 앱 본체, 사용 방법, FAQ, PDF 용량 줄이기 팁
+- [사이트 소개](https://cgangpdf.pages.dev/about.html): 만든 이유와 서버 없는 동작 원리
+- [개인정보 처리방침](https://cgangpdf.pages.dev/privacy.html)
+- [문의하기](https://cgangpdf.pages.dev/contact.html): cgangpdf@gmail.com

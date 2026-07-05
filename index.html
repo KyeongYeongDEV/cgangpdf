@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>무료 PDF 편집 · 무료 PDF 압축 — CgangPDF (설치·업로드 없이)</title>
 <meta name="description" content="무료 PDF 편집(페이지 순서 변경·페이지 삭제)과 무료 PDF 압축(용량 줄이기)을 설치 없이 브라우저에서. 파일이 서버로 전송되지 않는 안전한 PDF 편집기, CgangPDF.">
-<meta name="keywords" content="무료 PDF 편집, 무료 PDF 압축, PDF 용량 줄이기, PDF 페이지 삭제, PDF 순서 변경, PDF 압축 사이트, PDF 편집 사이트, 온라인 PDF 편집기">
+<meta name="keywords" content="무료 PDF 편집, 무료 PDF 압축, PDF 용량 줄이기, PDF 페이지 삭제, PDF 순서 변경, PDF 압축 사이트, PDF 편집 사이트, 온라인 PDF 편집기, JPG PDF 변환, 이미지 PDF 변환, PDF JPG 변환">
 <link rel="canonical" href="https://cgangpdf.pages.dev/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="무료 PDF 편집 · 무료 PDF 압축 — CgangPDF">
@@ -42,6 +42,8 @@
         "PDF 페이지 순서 변경 (무손실)",
         "PDF 페이지 삭제 (무손실)",
         "3단계 PDF 압축 (72/150/300dpi)",
+        "이미지(JPG/PNG) → PDF 변환",
+        "PDF → 이미지(JPG) 추출",
         "전체화면 페이지 미리보기",
         "서버 업로드 없는 브라우저 내 처리"
       ]
@@ -91,6 +93,7 @@
 </script>
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; }
   body {
@@ -231,15 +234,17 @@
   </nav>
   <span class="name" id="fname"></span>
   <button id="reset" hidden>다른 파일</button>
+  <button id="extract" hidden>이미지로 추출</button>
   <button id="compress" hidden>압축</button>
   <button class="primary" id="apply" hidden>적용 &amp; 다운로드</button>
 </header>
 
 <div id="drop">
-  <strong>PDF를 여기로 드래그하거나 클릭해서 선택</strong>
-  <p>페이지 순서 변경(드래그) · 페이지 삭제(✕) · 클릭하면 크게 보기.<br>
+  <strong>PDF 또는 이미지(JPG·PNG)를 여기로 드래그하거나 클릭해서 선택</strong>
+  <p>PDF: 페이지 순서 변경 · 삭제 · 압축 · 이미지로 추출<br>
+     이미지 여러 장: 순서를 정해 하나의 PDF로 변환<br>
      서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)</p>
-  <input type="file" id="file" accept="application/pdf" hidden>
+  <input type="file" id="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple hidden>
 </div>
 
 <div class="spinner" id="spin" hidden></div>
@@ -254,6 +259,7 @@
     <div class="features">
       <div><strong>📄 무료 PDF 편집</strong>썸네일을 드래그해서 페이지 순서를 바꾸고, 필요 없는 페이지는 ✕ 버튼으로 삭제합니다. 원본 화질 그대로(무손실) 저장됩니다.</div>
       <div><strong>🗜️ 무료 PDF 압축</strong>저화질·중화질·고화질 3단계 중에서 선택해 PDF 용량을 줄입니다. 스캔본이나 이미지 위주 PDF에서 효과가 큽니다.</div>
+      <div><strong>🔄 PDF ↔ 이미지 변환</strong>JPG·PNG 여러 장을 순서대로 묶어 하나의 PDF로 만들거나, 반대로 PDF의 각 페이지를 JPG 이미지로 추출합니다.</div>
       <div><strong>🔒 완전한 프라이버시</strong>파일이 서버로 전송되지 않습니다. 모든 처리가 내 브라우저 안에서만 이루어지고, 탭을 닫으면 흔적 없이 사라집니다.</div>
     </div>
   </section>
@@ -289,6 +295,10 @@
     <details>
       <summary>100MB보다 큰 파일은 어떻게 하나요?</summary>
       <p>브라우저 메모리 한계 때문에 안정적인 처리를 위해 100MB로 제한하고 있습니다. 더 큰 파일은 먼저 앞뒤로 나누어 처리하거나, 데스크톱용 도구(Ghostscript 등)를 사용하는 것을 권장합니다.</p>
+    </details>
+    <details>
+      <summary>JPG 사진을 PDF로 바꿀 수 있나요?</summary>
+      <p>네. 첫 화면에서 JPG·PNG 이미지를 여러 장 선택하거나 끌어다 놓으면 썸네일이 나타나고, 드래그로 순서를 정한 뒤 <strong>PDF로 저장</strong>을 누르면 한 개의 PDF로 합쳐집니다. 반대로 PDF를 열고 <strong>이미지로 추출</strong>을 누르면 각 페이지가 JPG로 변환되어 ZIP 파일로 저장됩니다.</p>
     </details>
     <details>
       <summary>무료인가요? 회원가입이 필요한가요?</summary>
@@ -346,43 +356,82 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
 let pdfDoc = null;      // pdf.js document (rendering)
 let origBytes = null;   // untouched copy for pdf-lib (editing)
 let origName = "";
+let mode = null;        // "pdf" | "images"
+let imageFiles = [];    // image mode: File objects
+let imageURLs = [];     // image mode: object URLs (thumbnail = full-res)
+
+const IMG_RE = /\.(jpe?g|png|webp)$/i;
 
 $("drop").onclick = () => $("file").click();
 $("drop").ondragover = e => { e.preventDefault(); $("drop").classList.add("over"); };
 $("drop").ondragleave = () => $("drop").classList.remove("over");
 $("drop").ondrop = e => {
   e.preventDefault(); $("drop").classList.remove("over");
-  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer.files.length) loadFiles([...e.dataTransfer.files]);
 };
-$("file").onchange = () => { if ($("file").files[0]) loadFile($("file").files[0]); };
+$("file").onchange = () => { if ($("file").files.length) loadFiles([...$("file").files]); };
 
-async function loadFile(f) {
-  if (!f.name.toLowerCase().endsWith(".pdf")) return alert("PDF 파일만 열 수 있습니다.");
-  if (f.size > MAX_MB * 1024 * 1024) {
+function enterEditView() {
+  $("drop").hidden = true;
+  $("content").hidden = true;
+  $("footer").hidden = true;
+  document.querySelectorAll("nav .homeOnly").forEach(a => a.hidden = true);
+}
+
+async function loadFiles(files) {
+  const pdfs = files.filter(f => f.name.toLowerCase().endsWith(".pdf"));
+  const imgs = files.filter(f => IMG_RE.test(f.name));
+  const total = files.reduce((s, f) => s + f.size, 0);
+  if (total > MAX_MB * 1024 * 1024) {
     return alert(
-      `파일이 ${(f.size / 1048576).toFixed(0)}MB라서 열 수 없습니다 (제한 ${MAX_MB}MB).\n` +
-      "큰 파일은 브라우저 메모리 한계로 느려지거나 멈출 수 있어요. 서버 버전(pdf-editor)을 사용하세요.");
+      `파일이 총 ${(total / 1048576).toFixed(0)}MB라서 열 수 없습니다 (제한 ${MAX_MB}MB).\n` +
+      "브라우저 메모리 한계로 느려지거나 멈출 수 있어요.");
   }
-  $("drop").hidden = true; $("spin").hidden = false;
+  if (pdfs.length === 1 && imgs.length === 0 && files.length === 1) return loadPdf(pdfs[0]);
+  if (imgs.length >= 1 && pdfs.length === 0 && imgs.length === files.length) return loadImages(imgs);
+  alert("PDF 1개 또는 이미지(JPG·PNG·WebP) 여러 장만 열 수 있습니다.\nPDF와 이미지를 섞어서 열 수는 없어요.");
+}
+
+async function loadPdf(f) {
+  enterEditView();
+  $("spin").hidden = false;
   $("spin").textContent = "PDF 여는 중…";
   try {
     const bytes = new Uint8Array(await f.arrayBuffer());
     origBytes = bytes.slice();   // pdf.js가 버퍼를 가져가므로 편집용 사본 보관
     origName = f.name;
+    mode = "pdf";
     pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
     $("fname").textContent = `${f.name} · ${pdfDoc.numPages}쪽`;
-    // 편집 모드: 소개·FAQ·푸터를 숨겨 편집 전용 화면으로 전환
-    $("content").hidden = true;
-    $("footer").hidden = true;
-    document.querySelectorAll("nav .homeOnly").forEach(a => a.hidden = true);
     await renderGrid();
-    $("apply").hidden = $("reset").hidden = $("compress").hidden = false;
+    $("apply").hidden = $("reset").hidden = $("compress").hidden = $("extract").hidden = false;
   } catch (err) {
     alert("PDF를 열 수 없습니다: " + err.message);
     location.reload();
   } finally {
     $("spin").hidden = true;
   }
+}
+
+async function loadImages(files) {
+  enterEditView();
+  mode = "images";
+  imageFiles = files;
+  imageURLs = files.map(f => URL.createObjectURL(f));
+  origName = files[0].name;
+  $("fname").textContent = files.length === 1
+    ? files[0].name
+    : `${files[0].name} 외 ${files.length - 1}장`;
+  const grid = $("grid");
+  grid.innerHTML = "";
+  files.forEach((f, i) => {
+    const card = makeCard(i + 1, `이미지 ${i + 1}`);
+    card.querySelector("img").src = imageURLs[i];
+    grid.appendChild(card);
+  });
+  setupGridDrag(grid);
+  $("apply").textContent = "PDF로 저장";
+  $("apply").hidden = $("reset").hidden = false;
 }
 
 async function renderPage(pageNum, targetLongSide, quality) {
@@ -398,32 +447,30 @@ async function renderPage(pageNum, targetLongSide, quality) {
   return url;
 }
 
-async function renderGrid() {
-  const grid = $("grid");
-  grid.innerHTML = "";
-  const n = pdfDoc.numPages;
-  for (let p = 1; p <= n; p++) {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.draggable = true;
-    card.dataset.page = p;
-    card.innerHTML = `
-      <img alt="p${p}">
-      <button class="del" title="삭제/복원">✕</button>
-      <div class="num">원본 ${p}쪽</div>`;
-    card.querySelector(".del").onclick = e => {
-      e.stopPropagation();
-      card.classList.toggle("deleted");
-    };
-    card.onclick = () => { if (!justDragged) openLightbox(cardList().indexOf(card)); };
-    card.addEventListener("dragstart", () => card.classList.add("dragging"));
-    card.addEventListener("dragend", () => {
-      card.classList.remove("dragging");
-      justDragged = true;
-      setTimeout(() => justDragged = false, 150);
-    });
-    grid.appendChild(card);
-  }
+function makeCard(page, label) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.draggable = true;
+  card.dataset.page = page;
+  card.innerHTML = `
+    <img alt="p${page}">
+    <button class="del" title="삭제/복원">✕</button>
+    <div class="num">${label}</div>`;
+  card.querySelector(".del").onclick = e => {
+    e.stopPropagation();
+    card.classList.toggle("deleted");
+  };
+  card.onclick = () => { if (!justDragged) openLightbox(cardList().indexOf(card)); };
+  card.addEventListener("dragstart", () => card.classList.add("dragging"));
+  card.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
+    justDragged = true;
+    setTimeout(() => justDragged = false, 150);
+  });
+  return card;
+}
+
+function setupGridDrag(grid) {
   grid.ondragover = e => {
     e.preventDefault();
     const dragging = grid.querySelector(".dragging");
@@ -435,6 +482,14 @@ async function renderGrid() {
     });
     after ? grid.insertBefore(dragging, after) : grid.appendChild(dragging);
   };
+}
+
+async function renderGrid() {
+  const grid = $("grid");
+  grid.innerHTML = "";
+  const n = pdfDoc.numPages;
+  for (let p = 1; p <= n; p++) grid.appendChild(makeCard(p, `원본 ${p}쪽`));
+  setupGridDrag(grid);
   // 썸네일은 순차 렌더링 (진행률 표시)
   $("spin").hidden = false;
   for (let p = 1; p <= n; p++) {
@@ -468,10 +523,13 @@ async function openLightbox(i) {
   const page = Number(card.dataset.page);
   $("lightbox").hidden = false;
   document.body.style.overflow = "hidden";
+  const unit = mode === "images" ? "이미지" : "원본";
+  const suffix = mode === "images" ? "" : "쪽";
   $("lbInfo").textContent =
-    `${lbIndex + 1} / ${cs.length} · 원본 ${page}쪽` +
+    `${lbIndex + 1} / ${cs.length} · ${unit} ${page}${suffix}` +
     (card.classList.contains("deleted") ? " · 삭제 예정" : "");
   $("lbImg").src = card.querySelector("img").src;   // 우선 썸네일로 즉시 표시
+  if (mode === "images") return;                    // 이미지 모드는 원본이 곧 고해상도
   const url = await previewURL(page);
   if (lbIndex >= 0 && Number(cardList()[lbIndex]?.dataset.page) === page)
     $("lbImg").src = url;                           // 고해상도로 교체
@@ -576,10 +634,83 @@ async function compressPdf(level) {
   }
 }
 
+// ---- PDF → 이미지 추출 (현재 순서·삭제 반영, ZIP 다운로드) ----
+$("extract").onclick = async () => {
+  const order = [...document.querySelectorAll(".card:not(.deleted)")]
+    .map(c => Number(c.dataset.page));
+  if (!order.length) return alert("남는 페이지가 없습니다.");
+  $("extract").disabled = $("apply").disabled = $("compress").disabled = true;
+  try {
+    const zip = new JSZip();
+    const pad = String(order.length).length;
+    for (let i = 0; i < order.length; i++) {
+      $("status").textContent = `이미지 추출 중… ${i + 1} / ${order.length}쪽`;
+      const dataUrl = await renderPage(order[i], 2000, 0.85);
+      zip.file(`${String(i + 1).padStart(pad, "0")}.jpg`,
+               dataUrl.split(",")[1], { base64: true });
+    }
+    $("status").textContent = "ZIP 만드는 중…";
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = origName.replace(/\.pdf$/i, "") + "_images.zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $("status").textContent = `추출 완료: ${order.length}장의 JPG를 ZIP으로 저장했습니다.`;
+  } catch (err) {
+    $("status").textContent = "";
+    alert("추출 실패: " + err.message);
+  } finally {
+    $("extract").disabled = $("apply").disabled = $("compress").disabled = false;
+  }
+};
+
+// ---- 이미지 → PDF 변환 ----
+async function imagesToPdf(order) {
+  const out = await PDFLib.PDFDocument.create();
+  for (let i = 0; i < order.length; i++) {
+    $("status").textContent = `PDF 만드는 중… ${i + 1} / ${order.length}장`;
+    const f = imageFiles[order[i] - 1];
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    let img;
+    if (/\.jpe?g$/i.test(f.name)) img = await out.embedJpg(bytes);
+    else if (/\.png$/i.test(f.name)) img = await out.embedPng(bytes);
+    else {
+      // WebP 등: pdf-lib이 직접 못 읽는 포맷은 canvas로 PNG 변환
+      const el = new Image();
+      await new Promise((res, rej) => { el.onload = res; el.onerror = rej; el.src = imageURLs[order[i] - 1]; });
+      const canvas = document.createElement("canvas");
+      canvas.width = el.naturalWidth; canvas.height = el.naturalHeight;
+      canvas.getContext("2d").drawImage(el, 0, 0);
+      const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+      canvas.width = canvas.height = 0;
+      img = await out.embedPng(new Uint8Array(await blob.arrayBuffer()));
+    }
+    const pg = out.addPage([img.width, img.height]);
+    pg.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+  }
+  const data = await out.save();
+  const blob = new Blob([data], { type: "application/pdf" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const stem = origName.replace(/\.[^.]+$/, "");
+  a.download = order.length === 1 ? `${stem}.pdf` : `${stem} 외 ${order.length - 1}장.pdf`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  $("status").textContent = `변환 완료: 이미지 ${order.length}장을 PDF로 저장했습니다.`;
+}
+
 $("apply").onclick = async () => {
   const order = [...document.querySelectorAll(".card:not(.deleted)")]
     .map(c => Number(c.dataset.page));
   if (!order.length) return alert("남는 페이지가 없습니다.");
+  if (mode === "images") {
+    $("apply").disabled = true;
+    try { await imagesToPdf(order); }
+    catch (err) { $("status").textContent = ""; alert("변환 실패: " + err.message); }
+    finally { $("apply").disabled = false; }
+    return;
+  }
   $("apply").disabled = true;
   $("status").textContent = "저장 중… (파일 크기에 따라 수십 초 걸릴 수 있어요)";
   try {

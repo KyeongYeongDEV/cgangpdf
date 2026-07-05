@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CgangPDF — 무료 PDF 페이지 편집·압축 (설치·업로드 없이 브라우저에서)</title>
+<meta name="description" content="PDF 페이지 순서 변경, 삭제, 3단계 압축을 무료로. 파일이 서버로 전송되지 않고 내 브라우저 안에서만 처리되는 안전한 PDF 편집기입니다.">
+<link rel="canonical" href="https://cgangpdf.com/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CgangPDF — 무료 PDF 페이지 편집·압축">
+<meta property="og:description" content="설치도 업로드도 없는 PDF 편집기. 페이지 순서 변경·삭제·압축이 전부 내 브라우저 안에서 처리됩니다.">
+<meta property="og:url" content="https://cgangpdf.com/">
+<meta property="og:locale" content="ko_KR">
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: "Apple SD Gothic Neo", Pretendard, sans-serif;
+    background: #f4f5f7; color: #1c1e21; min-height: 100vh;
+  }
+  header {
+    background: #fff; border-bottom: 1px solid #e3e5e8;
+    padding: 14px 24px; display: flex; align-items: center; gap: 16px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 17px; font-weight: 700; }
+  header nav { display: flex; gap: 14px; }
+  header nav a { color: #556; font-size: 13px; text-decoration: none; }
+  header nav a:hover { color: #2563eb; }
+  header .name { color: #667; font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button {
+    border: 0; border-radius: 8px; padding: 9px 16px; font-size: 14px;
+    cursor: pointer; font-weight: 600; background: #e9ebee;
+  }
+  button:hover { filter: brightness(0.96); }
+  button.primary { background: #2563eb; color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  #drop {
+    max-width: 560px; margin: 12vh auto; padding: 64px 32px;
+    border: 2px dashed #b9bec7; border-radius: 16px; text-align: center;
+    background: #fff; cursor: pointer; transition: border-color .15s;
+  }
+  #drop.over { border-color: #2563eb; background: #f0f6ff; }
+  #drop p { color: #556; margin-top: 8px; font-size: 14px; }
+  #drop strong { font-size: 17px; }
+  #grid {
+    display: grid; gap: 14px; padding: 20px 24px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .card {
+    background: #fff; border: 1px solid #e3e5e8; border-radius: 10px;
+    padding: 8px; cursor: grab; position: relative; user-select: none;
+    transition: box-shadow .12s;
+  }
+  .card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .card.dragging { opacity: .35; }
+  .card img { width: 100%; display: block; border: 1px solid #eef0f2; background: #fafafa; pointer-events: none; }
+  .card .num { text-align: center; font-size: 12px; color: #667; padding-top: 6px; }
+  .card .del {
+    position: absolute; top: 4px; right: 4px; width: 26px; height: 26px;
+    border-radius: 50%; background: rgba(255,255,255,.92); color: #c22;
+    font-size: 14px; line-height: 1; padding: 0; border: 1px solid #e3e5e8;
+  }
+  .card.deleted img { opacity: .22; }
+  .card.deleted::after {
+    content: "삭제됨"; position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center; color: #c22; font-weight: 700;
+  }
+  .card.deleted .del { color: #16a34a; }
+  #status { padding: 0 24px 24px; color: #667; font-size: 13px; }
+  .spinner { text-align: center; padding: 12vh 0; color: #556; font-size: 15px; }
+  #lightbox {
+    position: fixed; inset: 0; z-index: 100; background: rgba(12,14,18,.92);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #lightbox[hidden] { display: none; }
+  #lbImg {
+    max-width: calc(100vw - 140px); max-height: calc(100vh - 70px);
+    object-fit: contain; background: #fff; border-radius: 4px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  }
+  #lightbox .nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 52px; height: 52px; border-radius: 50%; font-size: 26px;
+    background: rgba(255,255,255,.12); color: #fff; line-height: 1;
+  }
+  #lightbox .nav:hover { background: rgba(255,255,255,.28); }
+  #lbPrev { left: 14px; }
+  #lbNext { right: 14px; }
+  #lbClose {
+    position: absolute; top: 14px; right: 14px; width: 42px; height: 42px;
+    border-radius: 50%; font-size: 18px; background: rgba(255,255,255,.12); color: #fff;
+  }
+  #lbInfo {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 14px; background: rgba(0,0,0,.45);
+    padding: 6px 14px; border-radius: 20px;
+  }
+  #cmpModal {
+    position: fixed; inset: 0; z-index: 90; background: rgba(12,14,18,.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #cmpModal[hidden] { display: none; }
+  #cmpModal .box {
+    background: #fff; border-radius: 14px; padding: 24px; width: 340px;
+    box-shadow: 0 12px 48px rgba(0,0,0,.25);
+  }
+  #cmpModal h2 { font-size: 16px; margin-bottom: 4px; }
+  #cmpModal .hint { font-size: 12px; color: #667; margin-bottom: 14px; }
+  #cmpModal .lv {
+    display: block; width: 100%; text-align: left; margin-top: 8px;
+    padding: 12px 14px; background: #f2f4f7; border: 1px solid #e3e5e8;
+  }
+  #cmpModal .lv:hover { background: #e9effc; border-color: #2563eb; }
+  #cmpModal .lv small { display: block; color: #667; font-weight: 400; margin-top: 2px; }
+  #cmpModal .cancel { margin-top: 14px; width: 100%; }
+  main.content { max-width: 820px; margin: 0 auto; padding: 8px 24px 40px; }
+  main.content section { margin-top: 48px; }
+  main.content h2 { font-size: 21px; margin-bottom: 14px; }
+  main.content h3 { font-size: 15px; margin: 18px 0 6px; }
+  main.content p, main.content li { font-size: 14.5px; line-height: 1.75; color: #333; }
+  main.content ol, main.content ul { padding-left: 22px; }
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .features div { background: #fff; border: 1px solid #e3e5e8; border-radius: 12px; padding: 18px; }
+  .features strong { display: block; margin-bottom: 6px; font-size: 15px; }
+  details {
+    background: #fff; border: 1px solid #e3e5e8; border-radius: 10px;
+    padding: 14px 18px; margin-top: 10px;
+  }
+  details summary { cursor: pointer; font-weight: 600; font-size: 14.5px; }
+  details p { margin-top: 10px; }
+  footer {
+    border-top: 1px solid #e3e5e8; margin-top: 48px; padding: 24px;
+    text-align: center; font-size: 13px; color: #667; background: #fff;
+  }
+  footer a { color: #556; margin: 0 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CgangPDF</h1>
+  <nav>
+    <a href="#guide">사용법</a>
+    <a href="#faq">FAQ</a>
+    <a href="about.html">소개</a>
+    <a href="privacy.html">개인정보</a>
+    <a href="contact.html">문의</a>
+  </nav>
+  <span class="name" id="fname"></span>
+  <button id="reset" hidden>다른 파일</button>
+  <button id="restore" hidden>삭제 취소</button>
+  <button id="compress" hidden>압축</button>
+  <button class="primary" id="apply" hidden>적용 &amp; 다운로드</button>
+</header>
+
+<div id="drop">
+  <strong>PDF를 여기로 드래그하거나 클릭해서 선택</strong>
+  <p>페이지 순서 변경(드래그) · 페이지 삭제(✕) · 클릭하면 크게 보기.<br>
+     서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)</p>
+  <input type="file" id="file" accept="application/pdf" hidden>
+</div>
+
+<div class="spinner" id="spin" hidden></div>
+<div id="grid"></div>
+<div id="status"></div>
+
+<main class="content">
+  <section id="features">
+    <h2>CgangPDF가 하는 일</h2>
+    <div class="features">
+      <div><strong>📄 페이지 편집</strong>썸네일을 드래그해서 순서를 바꾸고, 필요 없는 페이지는 ✕ 버튼으로 삭제합니다. 원본 화질 그대로(무손실) 저장됩니다.</div>
+      <div><strong>🗜️ 3단계 압축</strong>저화질·중화질·고화질 중에서 선택해 파일 크기를 줄입니다. 스캔본이나 이미지 위주 PDF에서 효과가 큽니다.</div>
+      <div><strong>🔒 완전한 프라이버시</strong>파일이 서버로 전송되지 않습니다. 모든 처리가 내 브라우저 안에서만 이루어지고, 탭을 닫으면 흔적 없이 사라집니다.</div>
+    </div>
+  </section>
+
+  <section id="guide">
+    <h2>사용 방법</h2>
+    <ol>
+      <li><strong>PDF 열기</strong> — 위쪽 점선 상자에 PDF 파일을 끌어다 놓거나, 클릭해서 파일을 선택합니다. (최대 100MB)</li>
+      <li><strong>페이지 확인</strong> — 모든 페이지가 썸네일로 나타납니다. 썸네일을 클릭하면 전체화면으로 크게 볼 수 있고, 좌우 화살표(← →)로 다음·이전 페이지를 넘겨볼 수 있습니다.</li>
+      <li><strong>편집</strong> — 썸네일을 드래그해서 순서를 바꾸고, ✕ 버튼으로 필요 없는 페이지를 삭제 표시합니다. 실수했다면 "삭제 취소"로 한 번에 되돌릴 수 있습니다.</li>
+      <li><strong>저장</strong> — 화질을 유지하려면 <strong>적용 &amp; 다운로드</strong>(무손실), 파일 크기를 줄이려면 <strong>압축</strong>에서 원하는 단계를 선택하세요. 편집한 순서와 삭제가 그대로 반영됩니다.</li>
+    </ol>
+  </section>
+
+  <section id="faq">
+    <h2>자주 묻는 질문</h2>
+    <details>
+      <summary>내 PDF 파일이 서버에 업로드되나요?</summary>
+      <p>아니요. CgangPDF에는 파일을 받는 서버 자체가 없습니다. PDF를 열고, 편집하고, 압축하는 모든 과정이 지금 보고 계신 브라우저 안에서만 실행됩니다. 인터넷 연결이 끊긴 상태에서도 동작할 정도로 완전한 로컬 처리 방식입니다.</p>
+    </details>
+    <details>
+      <summary>"적용 &amp; 다운로드"와 "압축"의 차이가 뭔가요?</summary>
+      <p><strong>적용 &amp; 다운로드</strong>는 페이지를 그대로 복사하는 무손실 저장이라 화질 저하가 전혀 없습니다. <strong>압축</strong>은 각 페이지를 이미지로 다시 그려서 저장하기 때문에 파일이 작아지는 대신 화질이 조금 낮아지고, 텍스트 선택·검색이 안 되게 됩니다. 순서 변경·삭제만 필요하면 "적용 &amp; 다운로드"를 쓰세요.</p>
+    </details>
+    <details>
+      <summary>압축했더니 파일이 오히려 커졌어요. 왜 그런가요?</summary>
+      <p>글자가 텍스트(폰트 정보)로 저장된 일반 문서 PDF는 원래 용량이 매우 작습니다. 이런 파일을 이미지 방식으로 압축하면 페이지 전체가 사진으로 바뀌면서 용량이 오히려 늘어날 수 있습니다. CgangPDF는 이런 경우를 감지해서 저장 전에 알려드립니다. 압축은 스캔본, 촬영본, 캡처본처럼 <strong>이미 이미지로 이루어진 PDF</strong>에서 효과가 큽니다.</p>
+    </details>
+    <details>
+      <summary>어떤 압축 단계를 선택해야 하나요?</summary>
+      <p>화면으로만 볼 파일이라면 <strong>중화질(150dpi)</strong>이 크기와 화질의 균형이 가장 좋습니다. 메일 첨부 등 용량이 최우선이면 <strong>저화질(72dpi)</strong>, 인쇄할 가능성이 있다면 <strong>고화질(300dpi)</strong>을 권장합니다.</p>
+    </details>
+    <details>
+      <summary>100MB보다 큰 파일은 어떻게 하나요?</summary>
+      <p>브라우저 메모리 한계 때문에 안정적인 처리를 위해 100MB로 제한하고 있습니다. 더 큰 파일은 먼저 앞뒤로 나누어 처리하거나, 데스크톱용 도구(Ghostscript 등)를 사용하는 것을 권장합니다.</p>
+    </details>
+    <details>
+      <summary>무료인가요? 회원가입이 필요한가요?</summary>
+      <p>완전 무료이며 회원가입도 필요 없습니다. 파일 개수나 사용 횟수 제한도 없습니다.</p>
+    </details>
+    <details>
+      <summary>지원하는 브라우저는?</summary>
+      <p>Chrome, Edge, Safari, Firefox 등 최신 브라우저를 모두 지원합니다. 데스크톱 환경에서 드래그 정렬이 가장 편리하며, 모바일에서는 보기와 삭제 기능 위주로 사용하는 것을 권장합니다.</p>
+    </details>
+  </section>
+
+  <section id="tips">
+    <h2>PDF 용량 줄이기 팁</h2>
+    <ul>
+      <li><strong>필요 없는 페이지부터 삭제하세요.</strong> 압축보다 페이지 삭제가 용량 감소 효과가 확실하고 화질 손해도 없습니다. 표지·백지·광고 페이지만 지워도 크게 줄어드는 경우가 많습니다.</li>
+      <li><strong>스캔본은 압축 효과가 큽니다.</strong> 스캐너나 카메라로 만든 PDF는 페이지 전체가 고해상도 이미지라서, 중화질 압축만으로도 50~80% 줄어드는 것이 일반적입니다.</li>
+      <li><strong>텍스트 PDF는 압축하지 마세요.</strong> 워드·한글에서 내보낸 문서형 PDF는 이미 충분히 작습니다. 압축하면 커질 수 있고 글자 검색 기능을 잃습니다.</li>
+      <li><strong>중요한 파일은 원본을 보관하세요.</strong> 압축은 되돌릴 수 없으므로, 원본을 지우지 말고 압축본과 함께 보관하는 것이 안전합니다.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <a href="about.html">사이트 소개</a> ·
+  <a href="privacy.html">개인정보 처리방침</a> ·
+  <a href="contact.html">문의하기</a>
+  <p style="margin-top:8px">© 2026 CgangPDF — 파일은 브라우저 밖으로 나가지 않습니다.</p>
+</footer>
+
+<div id="lightbox" hidden>
+  <img id="lbImg" alt="page preview">
+  <button class="nav" id="lbPrev" title="이전 페이지">‹</button>
+  <button class="nav" id="lbNext" title="다음 페이지">›</button>
+  <button id="lbClose" title="닫기 (Esc)">✕</button>
+  <div id="lbInfo"></div>
+</div>
+
+<div id="cmpModal" hidden>
+  <div class="box">
+    <h2>압축 단계 선택</h2>
+    <div class="hint">현재 편집 상태(순서·삭제)가 그대로 적용됩니다.<br>페이지가 이미지로 변환되어 저장됩니다.</div>
+    <button class="lv" data-level="1">1. 저화질 고압축<small>72dpi · 파일이 가장 작아짐</small></button>
+    <button class="lv" data-level="2">2. 중화질 중압축<small>150dpi · 화면 보기용 균형</small></button>
+    <button class="lv" data-level="3">3. 고화질 저압축<small>300dpi · 화질 우선</small></button>
+    <button class="cancel">취소</button>
+  </div>
+</div>
+
+<script>
+const MAX_MB = 100;
+const $ = id => document.getElementById(id);
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+
+let pdfDoc = null;      // pdf.js document (rendering)
+let origBytes = null;   // untouched copy for pdf-lib (editing)
+let origName = "";
+
+$("drop").onclick = () => $("file").click();
+$("drop").ondragover = e => { e.preventDefault(); $("drop").classList.add("over"); };
+$("drop").ondragleave = () => $("drop").classList.remove("over");
+$("drop").ondrop = e => {
+  e.preventDefault(); $("drop").classList.remove("over");
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+};
+$("file").onchange = () => { if ($("file").files[0]) loadFile($("file").files[0]); };
+
+async function loadFile(f) {
+  if (!f.name.toLowerCase().endsWith(".pdf")) return alert("PDF 파일만 열 수 있습니다.");
+  if (f.size > MAX_MB * 1024 * 1024) {
+    return alert(
+      `파일이 ${(f.size / 1048576).toFixed(0)}MB라서 열 수 없습니다 (제한 ${MAX_MB}MB).\n` +
+      "큰 파일은 브라우저 메모리 한계로 느려지거나 멈출 수 있어요. 서버 버전(pdf-editor)을 사용하세요.");
+  }
+  $("drop").hidden = true; $("spin").hidden = false;
+  $("spin").textContent = "PDF 여는 중…";
+  try {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    origBytes = bytes.slice();   // pdf.js가 버퍼를 가져가므로 편집용 사본 보관
+    origName = f.name;
+    pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+    $("fname").textContent = `${f.name} · ${pdfDoc.numPages}쪽`;
+    await renderGrid();
+    $("apply").hidden = $("reset").hidden = $("restore").hidden = $("compress").hidden = false;
+  } catch (err) {
+    alert("PDF를 열 수 없습니다: " + err.message);
+    location.reload();
+  } finally {
+    $("spin").hidden = true;
+  }
+}
+
+async function renderPage(pageNum, targetLongSide, quality) {
+  const page = await pdfDoc.getPage(pageNum);
+  const base = page.getViewport({ scale: 1 });
+  const scale = Math.min(2.5, targetLongSide / Math.max(base.width, base.height));
+  const vp = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = vp.width; canvas.height = vp.height;
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+  const url = canvas.toDataURL("image/jpeg", quality);
+  canvas.width = canvas.height = 0;   // 메모리 즉시 반환
+  return url;
+}
+
+async function renderGrid() {
+  const grid = $("grid");
+  grid.innerHTML = "";
+  const n = pdfDoc.numPages;
+  for (let p = 1; p <= n; p++) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.draggable = true;
+    card.dataset.page = p;
+    card.innerHTML = `
+      <img alt="p${p}">
+      <button class="del" title="삭제/복원">✕</button>
+      <div class="num">원본 ${p}쪽</div>`;
+    card.querySelector(".del").onclick = e => {
+      e.stopPropagation();
+      card.classList.toggle("deleted");
+    };
+    card.onclick = () => { if (!justDragged) openLightbox(cardList().indexOf(card)); };
+    card.addEventListener("dragstart", () => card.classList.add("dragging"));
+    card.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      justDragged = true;
+      setTimeout(() => justDragged = false, 150);
+    });
+    grid.appendChild(card);
+  }
+  grid.ondragover = e => {
+    e.preventDefault();
+    const dragging = grid.querySelector(".dragging");
+    if (!dragging) return;
+    const after = [...grid.querySelectorAll(".card:not(.dragging)")].find(c => {
+      const r = c.getBoundingClientRect();
+      return e.clientY < r.top + r.height / 2 ||
+             (e.clientY < r.bottom && e.clientX < r.left + r.width / 2);
+    });
+    after ? grid.insertBefore(dragging, after) : grid.appendChild(dragging);
+  };
+  // 썸네일은 순차 렌더링 (진행률 표시)
+  $("spin").hidden = false;
+  for (let p = 1; p <= n; p++) {
+    $("spin").textContent = `썸네일 생성 중… ${p} / ${n}`;
+    const url = await renderPage(p, 300, 0.7);
+    const img = grid.querySelector(`.card[data-page="${p}"] img`);
+    if (img) img.src = url;
+  }
+  $("spin").hidden = true;
+}
+
+// ---- 전체화면 페이지 뷰어 ----
+let justDragged = false;
+let lbIndex = -1;
+const cardList = () => [...document.querySelectorAll("#grid .card")];
+const previewCache = new Map();   // page -> dataURL (최근 10쪽만 유지)
+
+async function previewURL(page) {
+  if (previewCache.has(page)) return previewCache.get(page);
+  const url = await renderPage(page, 3200, 0.85);
+  previewCache.set(page, url);
+  if (previewCache.size > 10) previewCache.delete(previewCache.keys().next().value);
+  return url;
+}
+
+async function openLightbox(i) {
+  const cs = cardList();
+  if (!cs.length) return;
+  lbIndex = (i + cs.length) % cs.length;
+  const card = cs[lbIndex];
+  const page = Number(card.dataset.page);
+  $("lightbox").hidden = false;
+  document.body.style.overflow = "hidden";
+  $("lbInfo").textContent =
+    `${lbIndex + 1} / ${cs.length} · 원본 ${page}쪽` +
+    (card.classList.contains("deleted") ? " · 삭제 예정" : "");
+  $("lbImg").src = card.querySelector("img").src;   // 우선 썸네일로 즉시 표시
+  const url = await previewURL(page);
+  if (lbIndex >= 0 && Number(cardList()[lbIndex]?.dataset.page) === page)
+    $("lbImg").src = url;                           // 고해상도로 교체
+  // 이웃 페이지 미리 렌더링
+  [lbIndex + 1, lbIndex - 1].forEach(j => {
+    const c = cs[(j + cs.length) % cs.length];
+    if (c) previewURL(Number(c.dataset.page));
+  });
+}
+function closeLightbox() {
+  $("lightbox").hidden = true;
+  lbIndex = -1;
+  document.body.style.overflow = "";
+}
+$("lbPrev").onclick = e => { e.stopPropagation(); openLightbox(lbIndex - 1); };
+$("lbNext").onclick = e => { e.stopPropagation(); openLightbox(lbIndex + 1); };
+$("lbClose").onclick = closeLightbox;
+$("lightbox").onclick = e => { if (e.target.id === "lightbox") closeLightbox(); };
+document.addEventListener("keydown", e => {
+  if ($("lightbox").hidden) return;
+  if (e.key === "Escape") closeLightbox();
+  else if (e.key === "ArrowLeft") openLightbox(lbIndex - 1);
+  else if (e.key === "ArrowRight") openLightbox(lbIndex + 1);
+});
+
+$("restore").onclick = () =>
+  document.querySelectorAll(".card.deleted").forEach(c => c.classList.remove("deleted"));
+
+$("reset").onclick = () => location.reload();
+
+// ---- 압축 (페이지를 이미지로 재렌더링) ----
+const CMP_LEVELS = {
+  1: { dpi: 72,  quality: 0.45, suffix: "low" },
+  2: { dpi: 150, quality: 0.7,  suffix: "medium" },
+  3: { dpi: 300, quality: 0.85, suffix: "high" },
+};
+const CMP_MAX_SIDE = 5000;   // 원본보다 크게 그려서 용량이 늘어나는 것 방지 상한
+
+$("compress").onclick = () => $("cmpModal").hidden = false;
+$("cmpModal").querySelector(".cancel").onclick = () => $("cmpModal").hidden = true;
+$("cmpModal").onclick = e => { if (e.target.id === "cmpModal") $("cmpModal").hidden = true; };
+$("cmpModal").querySelectorAll(".lv").forEach(b =>
+  b.onclick = () => { $("cmpModal").hidden = true; compressPdf(Number(b.dataset.level)); });
+
+async function compressPdf(level) {
+  const { dpi, quality, suffix } = CMP_LEVELS[level];
+  const order = [...document.querySelectorAll(".card:not(.deleted)")]
+    .map(c => Number(c.dataset.page));
+  if (!order.length) return alert("남는 페이지가 없습니다.");
+  $("compress").disabled = $("apply").disabled = true;
+  try {
+    const out = await PDFLib.PDFDocument.create();
+    for (let i = 0; i < order.length; i++) {
+      $("status").textContent = `압축 중… ${i + 1} / ${order.length}쪽`;
+      const page = await pdfDoc.getPage(order[i]);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.max(0.1,
+        Math.min(dpi / 72, CMP_MAX_SIDE / Math.max(base.width, base.height)));
+      const vp = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = vp.width; canvas.height = vp.height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";                      // JPEG은 투명도가 없음
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
+      canvas.width = canvas.height = 0;
+      const img = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+      const pg = out.addPage([base.width, base.height]);
+      pg.drawImage(img, { x: 0, y: 0, width: base.width, height: base.height });
+    }
+    $("status").textContent = "저장 중…";
+    const data = await out.save();
+    const mb = n => n >= 1048576
+      ? (n / 1048576).toFixed(1) + "MB"
+      : Math.max(1, Math.round(n / 1024)) + "KB";
+    if (data.length >= origBytes.length) {
+      const ok = confirm(
+        `압축 결과(${mb(data.length)})가 원본(${mb(origBytes.length)})보다 커졌습니다.\n\n` +
+        "왜 커졌나요?\n" +
+        "이 압축은 각 페이지를 이미지(사진)로 다시 그려서 저장합니다.\n" +
+        "텍스트 위주 PDF는 글자가 폰트 정보로 저장되어 원래 용량이 매우 작기 때문에,\n" +
+        "이미지로 바꾸면 오히려 용량이 커지고 글자 선택·검색·선명한 확대도 안 됩니다.\n\n" +
+        "이런 파일은 압축하지 않고 원본을 쓰는 것을 권장합니다.\n" +
+        "그래도 압축본을 저장할까요?");
+      if (!ok) {
+        $("status").textContent =
+          `압축을 취소했습니다 — 원본(${mb(origBytes.length)})이 압축본(${mb(data.length)})보다 작습니다.`;
+        return;
+      }
+    }
+    const blob = new Blob([data], { type: "application/pdf" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = origName.replace(/\.pdf$/i, "") + `_compressed_${suffix}.pdf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $("status").textContent =
+      `압축 완료: ${mb(origBytes.length)} → ${mb(data.length)} (${order.length}쪽)`;
+  } catch (err) {
+    $("status").textContent = "";
+    alert("압축 실패: " + err.message);
+  } finally {
+    $("compress").disabled = $("apply").disabled = false;
+  }
+}
+
+$("apply").onclick = async () => {
+  const order = [...document.querySelectorAll(".card:not(.deleted)")]
+    .map(c => Number(c.dataset.page));
+  if (!order.length) return alert("남는 페이지가 없습니다.");
+  $("apply").disabled = true;
+  $("status").textContent = "저장 중… (파일 크기에 따라 수십 초 걸릴 수 있어요)";
+  try {
+    const src = await PDFLib.PDFDocument.load(origBytes, { ignoreEncryption: true });
+    const out = await PDFLib.PDFDocument.create();
+    const copied = await out.copyPages(src, order.map(p => p - 1));
+    copied.forEach(pg => out.addPage(pg));
+    const data = await out.save();
+    const blob = new Blob([data], { type: "application/pdf" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = origName.replace(/\.pdf$/i, "") + "_edited.pdf";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $("status").textContent = `완료: ${order.length}쪽으로 저장했습니다.`;
+  } catch (err) {
+    $("status").textContent = "";
+    alert("저장 실패: " + err.message);
+  } finally {
+    $("apply").disabled = false;
+  }
+};
+</script>
+</body>
+</html>

@@ -251,7 +251,8 @@
   main.content h3 { font-size: 15px; margin: 18px 0 6px; }
   main.content p, main.content li { font-size: 14.5px; line-height: 1.75; color: #333; }
   main.content ol, main.content ul { padding-left: 22px; }
-  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 560px) { .features { grid-template-columns: 1fr; } }
   .features div { background: #fff; border: 1px solid #e3e5e8; border-radius: 12px; padding: 18px; }
   .features strong { display: block; margin-bottom: 6px; font-size: 15px; }
   details {

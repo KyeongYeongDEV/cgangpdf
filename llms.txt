@@ -18,6 +18,6 @@
 ## 페이지
 
 - [홈 (편집기)](https://cgangpdf.pages.dev/): 앱 본체, 사용 방법, FAQ, PDF 용량 줄이기 팁
-- [사이트 소개](https://cgangpdf.pages.dev/about.html): 만든 이유와 서버 없는 동작 원리
-- [개인정보 처리방침](https://cgangpdf.pages.dev/privacy.html)
-- [문의하기](https://cgangpdf.pages.dev/contact.html): cgangpdf@gmail.com
+- [사이트 소개](https://cgangpdf.pages.dev/about): 만든 이유와 서버 없는 동작 원리
+- [개인정보 처리방침](https://cgangpdf.pages.dev/privacy)
+- [문의하기](https://cgangpdf.pages.dev/contact): cgangpdf@gmail.com

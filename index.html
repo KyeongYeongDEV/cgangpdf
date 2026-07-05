@@ -283,14 +283,14 @@
   </button>
   <button class="tool" id="chooseConvert">
     <span class="big">🔄 파일 형변환</span>
-    <span>이미지(JPG·PNG) 여러 장 → 하나의 PDF<br>PDF → 페이지별 JPG 이미지(ZIP)</span>
+    <span>이미지(JPG·PNG·WebP·GIF 등) 여러 장 → 하나의 PDF<br>PDF → 페이지별 JPG 이미지(ZIP)</span>
   </button>
 </div>
 
 <div id="drop" hidden>
   <strong id="dropTitle"></strong>
   <p id="dropDesc"></p>
-  <input type="file" id="file" accept="application/pdf,image/jpeg,image/png,image/webp" multiple hidden>
+  <input type="file" id="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,image/svg+xml" multiple hidden>
 </div>
 <button id="backHome" hidden>← 처음으로 돌아가기</button>
 
@@ -306,7 +306,7 @@
     <div class="features">
       <div><strong>📄 무료 PDF 편집</strong>썸네일을 드래그해서 페이지 순서를 바꾸고, 필요 없는 페이지는 ✕ 버튼으로 삭제합니다. 확대 보기에서 펜·형광펜으로 필기하거나 페이지를 자를 수도 있습니다. 원본 화질 그대로(무손실) 저장됩니다.</div>
       <div><strong>🗜️ 무료 PDF 압축</strong>저화질·중화질·고화질 3단계 중에서 선택해 PDF 용량을 줄입니다. 스캔본이나 이미지 위주 PDF에서 효과가 큽니다.</div>
-      <div><strong>🔄 PDF ↔ 이미지 변환</strong>JPG·PNG 여러 장을 순서대로 묶어 하나의 PDF로 만들거나, 반대로 PDF의 각 페이지를 JPG 이미지로 추출합니다.</div>
+      <div><strong>🔄 PDF ↔ 이미지 변환</strong>JPG·PNG·GIF 등 여러 장을 순서대로 묶어 하나의 PDF로 만들거나, 반대로 PDF의 각 페이지를 JPG 이미지로 추출합니다.</div>
       <div><strong>🔒 완전한 프라이버시</strong>파일이 서버로 전송되지 않습니다. 모든 처리가 내 브라우저 안에서만 이루어지고, 탭을 닫으면 흔적 없이 사라집니다.</div>
     </div>
   </section>
@@ -346,7 +346,7 @@
     </details>
     <details>
       <summary>JPG 사진을 PDF로 바꿀 수 있나요?</summary>
-      <p>네. 첫 화면에서 JPG·PNG 이미지를 여러 장 선택하거나 끌어다 놓으면 썸네일이 나타나고, 드래그로 순서를 정한 뒤 <strong>PDF로 저장</strong>을 누르면 한 개의 PDF로 합쳐집니다. 반대로 PDF를 열고 <strong>이미지로 추출</strong>을 누르면 각 페이지가 JPG로 변환되어 ZIP 파일로 저장됩니다.</p>
+      <p>네. 첫 화면에서 JPG·JPEG·PNG·WebP·GIF·BMP·AVIF·SVG 이미지를 여러 장 선택하거나 끌어다 놓으면 썸네일이 나타나고, 드래그로 순서를 정한 뒤 <strong>PDF로 저장</strong>을 누르면 한 개의 PDF로 합쳐집니다. 반대로 PDF를 열고 <strong>이미지로 추출</strong>을 누르면 각 페이지가 JPG로 변환되어 ZIP 파일로 저장됩니다.</p>
     </details>
     <details>
       <summary>무료인가요? 회원가입이 필요한가요?</summary>
@@ -436,7 +436,7 @@ let mode = null;        // "pdf" | "images"
 let imageFiles = [];    // image mode: File objects
 let imageURLs = [];     // image mode: object URLs (thumbnail = full-res)
 
-const IMG_RE = /\.(jpe?g|png|webp)$/i;
+const IMG_RE = /\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i;
 
 // ---- 작업 선택 (홈 → 편집 / 형변환 페이지) ----
 let tool = null;   // null(홈) | "edit" | "convert"
@@ -448,9 +448,9 @@ const TOOL_TEXT = {
     accept: "application/pdf",
   },
   convert: {
-    title: "PDF 또는 이미지(JPG·PNG)를 드래그하거나 클릭해서 선택",
-    desc: "이미지 여러 장 → 순서를 정해 하나의 PDF로<br>PDF → 페이지별 JPG 이미지(ZIP)로<br>서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)",
-    accept: "application/pdf,image/jpeg,image/png,image/webp",
+    title: "PDF 또는 이미지를 드래그하거나 클릭해서 선택",
+    desc: "이미지(JPG·JPEG·PNG·WebP·GIF·BMP·AVIF·SVG) 여러 장 → 순서를 정해 하나의 PDF로<br>PDF → 페이지별 JPG 이미지(ZIP)로<br>서버 없이 브라우저 안에서만 처리됩니다. (최대 100MB)",
+    accept: "application/pdf,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif,image/svg+xml",
   },
 };
 
@@ -520,7 +520,7 @@ async function loadFiles(files) {
   }
   if (pdfs.length === 1 && imgs.length === 0 && files.length === 1) return loadPdf(pdfs[0]);
   if (imgs.length >= 1 && pdfs.length === 0 && imgs.length === files.length) return loadImages(imgs);
-  alert("PDF 1개 또는 이미지(JPG·PNG·WebP) 여러 장만 열 수 있습니다.\nPDF와 이미지를 섞어서 열 수는 없어요.");
+  alert("PDF 1개 또는 이미지(JPG·PNG·WebP·GIF·BMP·AVIF·SVG) 여러 장만 열 수 있습니다.\nPDF와 이미지를 섞어서 열 수는 없어요.");
 }
 
 async function loadPdf(f) {
@@ -1050,8 +1050,9 @@ async function imagesToPdf(order) {
       const el = new Image();
       await new Promise((res, rej) => { el.onload = res; el.onerror = rej; el.src = imageURLs[order[i] - 1]; });
       const canvas = document.createElement("canvas");
-      canvas.width = el.naturalWidth; canvas.height = el.naturalHeight;
-      canvas.getContext("2d").drawImage(el, 0, 0);
+      canvas.width = el.naturalWidth || 1200;
+      canvas.height = el.naturalHeight || 1200;
+      canvas.getContext("2d").drawImage(el, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
       canvas.width = canvas.height = 0;
       img = await out.embedPng(new Uint8Array(await blob.arrayBuffer()));

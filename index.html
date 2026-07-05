@@ -142,8 +142,8 @@
 <header>
   <h1>CgangPDF</h1>
   <nav>
-    <a href="#guide">사용법</a>
-    <a href="#faq">FAQ</a>
+    <a href="#guide" class="homeOnly">사용법</a>
+    <a href="#faq" class="homeOnly">FAQ</a>
     <a href="about.html">소개</a>
     <a href="privacy.html">개인정보</a>
     <a href="contact.html">문의</a>
@@ -166,7 +166,7 @@
 <div id="grid"></div>
 <div id="status"></div>
 
-<main class="content">
+<main class="content" id="content">
   <section id="features">
     <h2>CgangPDF가 하는 일</h2>
     <div class="features">
@@ -229,7 +229,7 @@
   </section>
 </main>
 
-<footer>
+<footer id="footer">
   <a href="about.html">사이트 소개</a> ·
   <a href="privacy.html">개인정보 처리방침</a> ·
   <a href="contact.html">문의하기</a>
@@ -289,6 +289,10 @@ async function loadFile(f) {
     origName = f.name;
     pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
     $("fname").textContent = `${f.name} · ${pdfDoc.numPages}쪽`;
+    // 편집 모드: 소개·FAQ·푸터를 숨겨 편집 전용 화면으로 전환
+    $("content").hidden = true;
+    $("footer").hidden = true;
+    document.querySelectorAll("nav .homeOnly").forEach(a => a.hidden = true);
     await renderGrid();
     $("apply").hidden = $("reset").hidden = $("restore").hidden = $("compress").hidden = false;
   } catch (err) {

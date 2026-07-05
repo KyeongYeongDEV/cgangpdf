@@ -2,7 +2,7 @@
 
 무료 PDF 페이지 편집·압축 웹사이트. 파일이 서버로 전송되지 않고 브라우저 안에서만 처리됩니다.
 
-**https://cgangpdf.pages.dev**
+🔗 **사이트 바로가기: [cgangpdf.pages.dev](https://cgangpdf.pages.dev)**
 
 ## 기능
 

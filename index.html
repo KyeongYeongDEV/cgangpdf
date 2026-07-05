@@ -45,7 +45,9 @@
         "페이지 자르기 (무손실 CropBox)",
         "3단계 PDF 압축 (72/150/300dpi)",
         "이미지(JPG/PNG) → PDF 변환",
-        "PDF → 이미지(JPG) 추출",
+        "PDF → 이미지(JPG/PNG/WebP) 추출",
+        "PDF → TXT 텍스트 추출",
+        "이미지 여러 장 → 움직이는 GIF",
         "전체화면 페이지 미리보기",
         "서버 업로드 없는 브라우저 내 처리"
       ]
@@ -77,6 +79,11 @@
           "@type": "Question",
           "name": "100MB보다 큰 파일은 어떻게 하나요?",
           "acceptedAnswer": { "@type": "Answer", "text": "브라우저 메모리 한계 때문에 안정적인 처리를 위해 100MB로 제한하고 있습니다. 더 큰 파일은 먼저 앞뒤로 나누어 처리하거나, 데스크톱용 도구를 사용하는 것을 권장합니다." }
+        },
+        {
+          "@type": "Question",
+          "name": "PDF를 워드(DOCX)나 한글(HWP)로 바꿀 수 있나요?",
+          "acceptedAnswer": { "@type": "Answer", "text": "HWP는 비공개 포맷이라 웹 기술로는 변환이 불가능합니다. 대신 TXT 텍스트 추출 기능을 제공하여, 추출한 글자를 워드나 한글에 붙여넣어 편집할 수 있습니다. 스캔본처럼 이미지로만 된 PDF에는 글자 정보가 없어 추출되지 않습니다." }
         },
         {
           "@type": "Question",
@@ -351,6 +358,10 @@
       <p>네. 첫 화면에서 JPG·JPEG·PNG·WebP·GIF·BMP·AVIF·SVG 이미지를 여러 장 선택하거나 끌어다 놓으면 썸네일이 나타나고, 드래그로 순서를 정한 뒤 <strong>변환하기</strong>를 누르고 최종 형식(PDF·JPG·PNG·WebP)을 선택하면 변환됩니다. 반대로 PDF를 열고 <strong>이미지로 추출</strong>을 누르면 각 페이지가 선택한 이미지 형식으로 변환되어 ZIP 파일로 저장됩니다.</p>
     </details>
     <details>
+      <summary>PDF를 워드(DOCX)나 한글(HWP)로 바꿀 수 있나요?</summary>
+      <p>HWP는 한글과컴퓨터의 비공개 포맷이라 웹 기술로는 변환이 불가능하고, 워드 변환도 레이아웃을 온전히 살리기 어렵습니다. 대신 CgangPDF는 <strong>TXT 텍스트 추출</strong>을 제공합니다 — 파일 형변환에서 PDF를 열고 TXT를 선택하면 글자만 추출되어, 워드나 한글에 붙여넣어 편집할 수 있습니다. 단, 스캔본처럼 이미지로만 된 PDF에는 글자 정보가 없어 추출되지 않습니다.</p>
+    </details>
+    <details>
       <summary>무료인가요? 회원가입이 필요한가요?</summary>
       <p>완전 무료이며 회원가입도 필요 없습니다. 파일 개수나 사용 횟수 제한도 없습니다.</p>
     </details>
@@ -423,6 +434,7 @@
     <button class="fmt" data-fmt="png">PNG<small>무손실 · 투명 배경 유지</small></button>
     <button class="fmt" data-fmt="webp">WebP<small>최신 포맷 · 고효율 압축</small></button>
     <button class="fmt" data-fmt="gif">GIF (움직이는 이미지)<small>여러 장을 0.5초 간격으로 넘기는 애니메이션</small></button>
+    <button class="fmt" data-fmt="txt">TXT (텍스트 추출)<small>글자만 추출 · 서식 없음 · 텍스트형 PDF 전용</small></button>
     <button class="cancel">취소</button>
   </div>
 </div>
@@ -1032,9 +1044,10 @@ function openFmtModal(kind) {
   fmtKind = kind;
   $("fmtModal").querySelector('[data-fmt="pdf"]').hidden = kind !== "images";
   $("fmtModal").querySelector('[data-fmt="gif"]').hidden = kind !== "images";
+  $("fmtModal").querySelector('[data-fmt="txt"]').hidden = kind !== "pdf";
   $("fmtHint").textContent = kind === "images"
     ? "현재 순서·삭제 상태가 그대로 반영됩니다."
-    : "PDF의 각 페이지가 선택한 형식의 이미지로 저장됩니다. (여러 장이면 ZIP)";
+    : "이미지 형식은 페이지별로 저장되고(여러 장이면 ZIP), TXT는 글자만 추출합니다.";
   $("fmtModal").hidden = false;
 }
 $("fmtModal").querySelector(".cancel").onclick = () => $("fmtModal").hidden = true;
@@ -1053,7 +1066,7 @@ $("fmtModal").querySelectorAll(".fmt").forEach(b =>
         else if (fmt === "gif") await imagesToGif(order);
         else await imagesToImages(order, fmt);
       } else {
-        await extractImages(order, fmt);
+        fmt === "txt" ? await extractText(order) : await extractImages(order, fmt);
       }
     } catch (err) {
       $("status").textContent = "";
@@ -1090,6 +1103,42 @@ async function extractImages(order, fmt) {
   downloadBlob(blob, origName.replace(/\.pdf$/i, "") + `_${fmt}.zip`);
   $("status").textContent =
     `추출 완료: ${order.length}장의 ${fmt.toUpperCase()}를 ZIP으로 저장했습니다.`;
+}
+
+// ---- PDF → 텍스트 추출 (텍스트형 PDF 전용) ----
+async function extractText(order) {
+  const pages = [];
+  for (let i = 0; i < order.length; i++) {
+    $("status").textContent = `텍스트 추출 중… ${i + 1} / ${order.length}쪽`;
+    const page = await pdfDoc.getPage(order[i]);
+    const tc = await page.getTextContent();
+    const lines = [];
+    let buf = "", lastY = null;
+    for (const it of tc.items) {
+      if (it.str) {
+        const y = it.transform[5];
+        if (lastY !== null && Math.abs(y - lastY) > 3 && buf) { lines.push(buf); buf = ""; }
+        buf += it.str;
+        lastY = y;
+      }
+      if (it.hasEOL && buf) { lines.push(buf); buf = ""; lastY = null; }
+    }
+    if (buf) lines.push(buf);
+    pages.push(lines.join("\n").trim());
+  }
+  if (pages.join("").trim().length < 20) {
+    $("status").textContent = "";
+    return alert(
+      "이 PDF에서는 추출할 텍스트를 찾지 못했습니다.\n\n" +
+      "스캔본·촬영본·캡처본처럼 페이지가 이미지로만 이루어진 PDF에는\n" +
+      "글자 정보가 들어있지 않습니다. 이런 파일은 이미지 추출(JPG/PNG)을 이용하세요.");
+  }
+  const body = pages
+    .map((t, i) => `===== ${i + 1}쪽 (원본 ${order[i]}쪽) =====\n${t}`)
+    .join("\n\n");
+  downloadBlob(new Blob(["\uFEFF" + body], { type: "text/plain;charset=utf-8" }),
+               origName.replace(/\.pdf$/i, "") + ".txt");
+  $("status").textContent = `텍스트 추출 완료: ${order.length}쪽 → TXT`;
 }
 
 // ---- 이미지 → 이미지 형식 변환 ----

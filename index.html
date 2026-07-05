@@ -96,6 +96,7 @@
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
+<script src="vendor/gifenc.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; }
   [hidden] { display: none !important; }
@@ -421,6 +422,7 @@
     <button class="fmt" data-fmt="jpg">JPG<small>사진에 적합 · 용량이 작음</small></button>
     <button class="fmt" data-fmt="png">PNG<small>무손실 · 투명 배경 유지</small></button>
     <button class="fmt" data-fmt="webp">WebP<small>최신 포맷 · 고효율 압축</small></button>
+    <button class="fmt" data-fmt="gif">GIF (움직이는 이미지)<small>여러 장을 0.5초 간격으로 넘기는 애니메이션</small></button>
     <button class="cancel">취소</button>
   </div>
 </div>
@@ -1029,6 +1031,7 @@ function currentOrder() {
 function openFmtModal(kind) {
   fmtKind = kind;
   $("fmtModal").querySelector('[data-fmt="pdf"]').hidden = kind !== "images";
+  $("fmtModal").querySelector('[data-fmt="gif"]').hidden = kind !== "images";
   $("fmtHint").textContent = kind === "images"
     ? "현재 순서·삭제 상태가 그대로 반영됩니다."
     : "PDF의 각 페이지가 선택한 형식의 이미지로 저장됩니다. (여러 장이면 ZIP)";
@@ -1046,7 +1049,9 @@ $("fmtModal").querySelectorAll(".fmt").forEach(b =>
     btns.forEach(id => $(id).disabled = true);
     try {
       if (fmtKind === "images") {
-        fmt === "pdf" ? await imagesToPdf(order) : await imagesToImages(order, fmt);
+        if (fmt === "pdf") await imagesToPdf(order);
+        else if (fmt === "gif") await imagesToGif(order);
+        else await imagesToImages(order, fmt);
       } else {
         await extractImages(order, fmt);
       }
@@ -1092,6 +1097,47 @@ async function loadImageEl(i) {
   const el = new Image();
   await new Promise((res, rej) => { el.onload = res; el.onerror = rej; el.src = imageURLs[i]; });
   return el;
+}
+
+// ---- 이미지 여러 장 → 움직이는 GIF ----
+const GIF_MAX_SIDE = 800;   // GIF는 용량이 크게 늘어나므로 크기 제한
+const GIF_DELAY_MS = 500;
+
+async function imagesToGif(order) {
+  // 프레임 크기는 첫 이미지 비율 기준으로 통일
+  const first = await loadImageEl(order[0] - 1);
+  const fw = first.naturalWidth || 1200, fh = first.naturalHeight || 1200;
+  const scale = Math.min(1, GIF_MAX_SIDE / Math.max(fw, fh));
+  const W = Math.max(1, Math.round(fw * scale)), H = Math.max(1, Math.round(fh * scale));
+  const { GIFEncoder, quantize, applyPalette } = gifenc;
+  const gif = GIFEncoder();
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  for (let i = 0; i < order.length; i++) {
+    $("status").textContent = `GIF 프레임 생성 중… ${i + 1} / ${order.length}장`;
+    const el = i === 0 ? first : await loadImageEl(order[i] - 1);
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, W, H);
+    // 비율 유지하며 프레임 안에 맞춤
+    const ew = el.naturalWidth || 1200, eh = el.naturalHeight || 1200;
+    const s2 = Math.min(W / ew, H / eh);
+    const dw = ew * s2, dh = eh * s2;
+    ctx.drawImage(el, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    const { data } = ctx.getImageData(0, 0, W, H);
+    const palette = quantize(data, 256);
+    const index = applyPalette(data, palette);
+    gif.writeFrame(index, W, H, { palette, delay: GIF_DELAY_MS });
+    await new Promise(r => setTimeout(r));   // UI 갱신 여유
+  }
+  gif.finish();
+  canvas.width = canvas.height = 0;
+  const blob = new Blob([gif.bytes()], { type: "image/gif" });
+  const stem = origName.replace(/\.[^.]+$/, "");
+  downloadBlob(blob, order.length === 1 ? `${stem}.gif` : `${stem}_외${order.length - 1}장.gif`);
+  const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB";
+  $("status").textContent =
+    `GIF 완료: ${order.length}장 → ${mb(blob.size)} (${GIF_DELAY_MS / 1000}초 간격)`;
 }
 
 async function imagesToImages(order, fmt) {
